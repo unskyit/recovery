@@ -137,6 +137,7 @@
         }
     </style>
 
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
@@ -306,6 +307,12 @@
         }
         function stopTimer() { clearInterval(timerInterval); }
 
+        // --- Background Workers ---
+        async function initPdfWorker() {
+            const res = await fetch('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js');
+            const blob = await res.blob();
+            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+        }
 
         // --- Core Async Engine ---
         async function processBatches(passwordBuffer, pdfTargetBytes, zipTarget, ext, batchSize) {
@@ -315,18 +322,28 @@
                 const batch = passwordBuffer.slice(i, i + batchSize);
                 
                 const promises = batch.map(async (pwd) => {
+                    let loadingTask = null;
                     try {
                         if (ext === 'pdf') {
-                            // CRITICAL FIX: The .slice() method creates a fresh clone of the bytes.
-                            // Without this, pdf-lib modifies the original array during decryption, 
-                            // corrupting the file in RAM and guaranteeing all future attempts fail.
-                            await PDFLib.PDFDocument.load(pdfTargetBytes.slice(), { password: pwd, updateMetadata: false }); 
-                            return pwd;
+                            // WE ARE BACK TO PDF.JS for the cracking phase!
+                            // By using data: Uint8Array instead of a Blob URL, we prevent the browser from 
+                            // collapsing under network/blob memory overhead.
+                            loadingTask = pdfjsLib.getDocument({
+                                data: pdfTargetBytes,
+                                password: pwd,
+                            });
+                            const doc = await loadingTask.promise; 
+                            await doc.destroy(); 
+                            return pwd; // Success!
                         } else {
                             await zipTarget.getData(new zip.BlobWriter(), { password: pwd }); 
                             return pwd;
                         }
                     } catch (err) { 
+                        // It failed. Ensure we completely nuke the loading task to prevent memory leaks.
+                        if (loadingTask && loadingTask.destroy) {
+                            try { await loadingTask.destroy(); } catch(e) {}
+                        }
                         return null; 
                     }
                 });
@@ -338,7 +355,7 @@
                 const found = results.find(r => r !== null);
                 if (found) return found;
 
-                // Yield to event loop
+                // Yield to event loop to clear garbage memory
                 await new Promise(resolve => setTimeout(resolve, 5));
             }
             return null;
@@ -352,18 +369,16 @@
             try {
                 // Phase 1: Setup Target & Check Encryption
                 if (ext === 'pdf') {
-                    // Load PDF into memory buffer once
+                    // Load the PDF completely into a byte array once to feed directly into pdf.js
                     pdfTargetBytes = new Uint8Array(await targetFile.arrayBuffer());
+                    
                     try { 
-                        // Test without password to see if it's already open
-                        await PDFLib.PDFDocument.load(pdfTargetBytes.slice(), { updateMetadata: false });
+                        const testTask = pdfjsLib.getDocument({ data: pdfTargetBytes });
+                        const test = await testTask.promise; 
+                        await test.destroy(); 
                         return 'UNENCRYPTED'; 
                     } catch (e) { 
-                        // pdf-lib throws if encrypted.
-                        const msg = e.message.toLowerCase();
-                        if (!msg.includes('password') && !msg.includes('encrypted')) {
-                            throw new Error("Invalid or corrupted PDF file.");
-                        }
+                        if (e.name !== 'PasswordException') throw e; 
                     }
                 } else {
                     zipR = new zip.ZipReader(new zip.BlobReader(targetFile));
@@ -421,7 +436,8 @@
             try {
                 const newName = file.name.replace(new RegExp(`\\.${ext}$`, 'i'), `${suffix}.${ext}`);
                 if (ext === 'pdf') {
-                    // Safe to load without .slice() here because we are passing it directly to be saved, not re-looped.
+                    // We use pdf-lib for SAVING ONLY. 
+                    // This is what generates your familiar "AES encrypted" warning if it fails to save a clean copy.
                     const doc = await PDFLib.PDFDocument.load(await file.arrayBuffer(), { password: pwd });
                     downloadBlob(new Blob([await doc.save()], { type: 'application/pdf' }), newName);
                 } else if (ext === 'zip') {
@@ -435,8 +451,12 @@
                 }
                 logMsg(`Clean copy saved: ${newName}`, 'success', '💾');
             } catch (err) {
-                if (err.message.includes('encrypted')) logMsg(`Auto-save skipped: File requires native device print-to-PDF trick.`, 'error', '⚠️');
-                else logMsg(`Save Error: ${err.message}`, 'error', '❌');
+                // If pdf-lib chokes on AES during save, it safely catches here.
+                if (err.message.includes('encrypted') || err.message.includes('Security')) {
+                    logMsg(`Password verified, but auto-save skipped: PDF is heavily AES encrypted. Please use the password to open it natively.`, 'error', '⚠️');
+                } else {
+                    logMsg(`Save Error: ${err.message}`, 'error', '❌');
+                }
             }
         }
 
@@ -466,6 +486,7 @@
 
             try {
                 logMsg(`Engine Booted | Concurrency: ${batchSize}x`, 'info', '🚀');
+                await initPdfWorker(); // Boot the pdf.js worker
                 startTimer();
                 
                 logMsg(`Streaming dictionary from disk (RAM Safe Mode)`, 'info', '🌊');
