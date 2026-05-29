@@ -3,51 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Async Engine v8</title>
+    <title>MYR PDF & ZIP Password Recovery Tool</title>
+    <meta name="description" content="A client-side, ultra-fast PDF and ZIP password recovery and decryption engine running entirely in your browser.">
+    
     <style>
+        /* Ultra-Flat, Modern, High-Contrast UI */
         :root {
-            --bg-base: #0f172a; --bg-surface: #1e293b; --bg-input: #0b1120;
-            --text-main: #f1f5f9; --text-muted: #94a3b8;
-            --primary: #0ea5e9; --primary-hover: #0284c7; /* Cyan / Sky Blue */
-            --success: #10b981; --error: #ef4444; --warning: #f59e0b;
-            --border: #334155; --log-bg: #020617;
+            --bg-base: #0a0a0a; 
+            --bg-surface: #141414; 
+            --bg-input: #1f1f1f;
+            --text-main: #f5f5f5; 
+            --text-muted: #888888;
+            --primary: #3b82f6; /* Calm Blue */
+            --primary-hover: #2563eb; 
+            --success: #10b981; 
+            --error: #ef4444; 
+            --border: #262626; 
+            --log-bg: #000000;
         }
 
         [data-theme="light"] {
-            --bg-base: #f8fafc; --bg-surface: #ffffff; --bg-input: #f1f5f9;
-            --text-main: #0f172a; --text-muted: #64748b;
-            --primary: #0284c7; --primary-hover: #0369a1;
-            --success: #059669; --error: #dc2626; --warning: #d97706;
-            --border: #cbd5e1; --log-bg: #f8fafc;
+            --bg-base: #f9fafb; 
+            --bg-surface: #ffffff; 
+            --bg-input: #f3f4f6;
+            --text-main: #111827; 
+            --text-muted: #6b7280;
+            --primary: #2563eb; 
+            --primary-hover: #1d4ed8;
+            --success: #059669; 
+            --error: #dc2626; 
+            --border: #e5e7eb; 
+            --log-bg: #f9fafb;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-base); color: var(--text-main); max-width: 1200px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; transition: all 0.3s ease; }
         
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        h2 { font-weight: 600; font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
-        .badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; letter-spacing: 1px;}
-        .batch-badge { background: var(--warning); margin-left: 5px; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: var(--bg-base); 
+            color: var(--text-main); 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 1rem; 
+            line-height: 1.5; 
+            font-size: 14px;
+            transition: background 0.2s ease, color 0.2s ease; 
+        }
         
-        .theme-btn { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-main); padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+        h1 { font-weight: 600; font-size: 1.1rem; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
+        .badge { background: var(--border); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
         
-        .panel { background: var(--bg-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 1.5rem; }
-        label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
-        input[type="file"] { width: 100%; padding: 0.75rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-main); margin-bottom: 1.25rem; }
+        .theme-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: 0.2s; }
+        .theme-btn:hover { background: var(--bg-surface); color: var(--text-main); }
         
-        .start-btn { background: var(--primary); color: white; border: none; padding: 1rem; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s, background 0.2s; }
-        .start-btn:active { transform: scale(0.98); }
-        .start-btn:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
+        /* Main Panels */
+        .card { background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border); padding: 1.25rem; margin-bottom: 1rem; }
+        
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--text-main); font-size: 13px; }
+        input[type="file"] { width: 100%; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 13px; outline: none; }
+        
+        /* Toggle Switch */
+        .toggle-container { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--border); margin-top: 5px; }
+        .toggle-text { display: flex; flex-direction: column; }
+        .toggle-title { font-weight: 500; font-size: 13px; }
+        .toggle-desc { font-size: 11px; color: var(--text-muted); }
+        
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .2s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .2s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(16px); }
 
-        #liveHud { background: var(--bg-surface); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid var(--primary); font-family: monospace; font-size: 0.9rem; display: none; }
+        /* Button */
+        .start-btn { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 500; width: 100%; font-size: 13px; letter-spacing: 0.2px; margin-top: 10px; transition: background 0.2s; }
+        .start-btn:disabled { background: var(--bg-input); color: var(--text-muted); cursor: not-allowed; }
+        
+        /* HUD & Logs */
+        #liveHud { background: var(--bg-surface); padding: 10px 12px; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--primary); font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; display: none; border-top: 1px solid var(--border); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--text-muted); }
 
-        .log-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-        @media (min-width: 768px) { .log-grid { grid-template-columns: 1fr 1fr; } }
+        .log-grid { display: flex; flex-direction: column; gap: 1rem; }
+        @media (min-width: 600px) { .log-grid { flex-direction: row; } .log-grid > div { flex: 1; } }
 
-        .log-box { background: var(--log-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; }
-        .log-title { font-weight: 600; margin-bottom: 0.75rem; display: block; font-size: 0.85rem; letter-spacing: 0.5px; }
+        .log-box { background: var(--log-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; height: 220px; overflow-y: auto; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; white-space: pre-wrap; line-height: 1.6; }
+        .log-header { font-weight: 500; margin-bottom: 8px; display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
-        .t-success { color: var(--success); } .t-error { color: var(--error); } .t-info { color: var(--primary); } .t-warn { color: var(--warning); } .t-muted { color: var(--text-muted); }
+        /* Typography Colors */
+        .t-success { color: var(--success); } .t-error { color: var(--error); } .t-primary { color: var(--primary); } .t-muted { color: var(--text-muted); }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -57,52 +102,68 @@
 <body>
 
     <div class="header">
-        <h2>
-            Recovery Engine <span class="badge">v8 ASYNC</span>
-            <span class="badge batch-badge" id="batchBadge">Calculating Array...</span>
-        </h2>
-        <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀️ Light</button>
+        <h1>MYR Recovery Engine <span class="badge" id="batchBadge">V9</span></h1>
+        <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">Light Mode</button>
     </div>
 
-    <div class="panel">
-        <label>1. Password Dictionary (.txt)</label>
-        <input type="file" id="dictFile" accept=".txt">
-        <label>2. Target Batches (.pdf, .zip)</label>
-        <input type="file" id="files" multiple accept=".pdf,.zip">
-        <button id="startBtn" class="start-btn">IGNITE CONCURRENCY ENGINE</button>
+    <div class="card">
+        <div class="form-group">
+            <label>Password Dictionary (.txt)</label>
+            <input type="file" id="dictFile" accept=".txt">
+        </div>
+        <div class="form-group">
+            <label>Encrypted Targets (.pdf, .zip)</label>
+            <input type="file" id="files" multiple accept=".pdf,.zip">
+        </div>
+        
+        <div class="toggle-container">
+            <div class="toggle-text">
+                <span class="toggle-title">Auto-Decrypt & Save</span>
+                <span class="toggle-desc">Automatically strips password and downloads a clean copy (filename_unlocked)</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="autoSaveToggle" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <button id="startBtn" class="start-btn">Start Recovery Process</button>
     </div>
 
-    <div id="liveHud">System standing by...</div>
+    <div id="liveHud">Status: Idle</div>
 
     <div class="log-grid">
         <div>
-            <span class="log-title t-info">LIVE TERMINAL</span>
+            <span class="log-header">Activity Log</span>
             <div id="logActivity" class="log-box t-muted"></div>
         </div>
         <div>
-            <span class="log-title t-success">RECOVERED SECRETS</span>
+            <span class="log-header">Recovered Data</span>
             <div id="logSuccess" class="log-box t-success"></div>
         </div>
     </div>
 
     <script>
-        // Optimal batch size: Double the CPU cores to keep the pipeline completely saturated.
+        // Engine Settings
         const CORES = navigator.hardwareConcurrency || 4;
         const BATCH_SIZE = Math.max(CORES * 2, 8); 
-        document.getElementById('batchBadge').textContent = `${BATCH_SIZE}x Parallel Batches`;
+        document.getElementById('batchBadge').textContent = `V9 • ${BATCH_SIZE}x Parallel`;
 
+        // Theme Toggle
         function toggleTheme() {
             const html = document.documentElement; const btn = document.getElementById('themeBtn');
             const isDark = html.getAttribute('data-theme') === 'dark';
             html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-            btn.textContent = isDark ? '🌙 Dark' : '☀️ Light';
+            btn.textContent = isDark ? 'Dark Mode' : 'Light Mode';
         }
 
+        // UI Helpers
         const UI = {
             btn: document.getElementById('startBtn'),
             hud: document.getElementById('liveHud'),
             act: document.getElementById('logActivity'),
-            suc: document.getElementById('logSuccess')
+            suc: document.getElementById('logSuccess'),
+            toggle: document.getElementById('autoSaveToggle')
         };
 
         const logMsg = (msg, type = 't-muted', box = 'act') => {
@@ -117,21 +178,21 @@
 
         let lastUpdate = 0;
         const yieldUI = () => new Promise(r => setTimeout(r, 0));
-        const updateHud = async (msg, color = 'var(--primary)', force = false) => {
+        const updateHud = async (msg, force = false) => {
             if (force || Date.now() - lastUpdate > 35) {
-                UI.hud.textContent = msg; UI.hud.style.borderLeftColor = color;
-                lastUpdate = Date.now(); await yieldUI();
+                UI.hud.textContent = msg; lastUpdate = Date.now(); await yieldUI();
             }
         };
 
-        // Initialize Native PDF.js background worker
+        // Initialize PDF Worker
         async function initPdfWorker() {
-            await updateHud('Waking native background workers...', 'var(--warning)', true);
+            await updateHud('Initializing native background workers...', true);
             const res = await fetch('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js');
             const blob = await res.blob();
             pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
         }
 
+        // Load Dictionary
         async function loadDictionary(file) {
             const stream = file.stream(); const reader = stream.getReader(); const decoder = new TextDecoder('utf-8');
             let rem = ''; const passes = [];
@@ -143,43 +204,36 @@
             if (rem) passes.push(rem); return passes;
         }
 
-        // --- The Asynchronous Concurrency Engine ---
+        // --- Core Async Engine ---
         async function processPDF(file, allPasswords) {
             const fileUrl = URL.createObjectURL(file);
             try {
-                // Pre-check
                 try {
                     const test = await pdfjsLib.getDocument({ url: fileUrl }).promise;
                     await test.destroy(); return 'UNENCRYPTED';
                 } catch (e) { if (e.name !== 'PasswordException') throw e; }
 
-                // Process in Parallel Batches
                 for (let i = 0; i < allPasswords.length; i += BATCH_SIZE) {
                     const batch = allPasswords.slice(i, i + BATCH_SIZE);
-                    await updateHud(`[${file.name}] Async Batch: ${i} to ${i + batch.length} / ${allPasswords.length}`, 'var(--primary)');
+                    await updateHud(`[${file.name}] Scanning: ${i} to ${i + batch.length} of ${allPasswords.length}`);
                     
-                    // Create an array of simultaneous promises
                     const promises = batch.map(async (pwd) => {
                         const task = pdfjsLib.getDocument({ url: fileUrl, password: pwd });
                         try {
                             const doc = await task.promise;
-                            await doc.destroy();
-                            return pwd; // Match!
+                            await doc.destroy(); return pwd;
                         } catch (err) {
                             if (task.destroy) task.destroy().catch(()=>{});
-                            if (err.name === 'PasswordException') return null; // Safe fail
-                            throw err; // Real crash
+                            if (err.name === 'PasswordException') return null;
+                            throw err;
                         }
                     });
 
-                    // Wait for the whole batch to finish instantly
                     const results = await Promise.all(promises);
                     const found = results.find(result => result !== null);
                     if (found) return found;
                 }
-            } finally {
-                URL.revokeObjectURL(fileUrl);
-            }
+            } finally { URL.revokeObjectURL(fileUrl); }
             return null;
         }
 
@@ -194,26 +248,22 @@
 
                 for (let i = 0; i < allPasswords.length; i += BATCH_SIZE) {
                     const batch = allPasswords.slice(i, i + BATCH_SIZE);
-                    await updateHud(`[${file.name}] Async Batch: ${i} to ${i + batch.length} / ${allPasswords.length}`, 'var(--primary)');
+                    await updateHud(`[${file.name}] Scanning: ${i} to ${i + batch.length} of ${allPasswords.length}`);
                     
                     const promises = batch.map(async (pwd) => {
-                        try {
-                            await target.getData(new zip.BlobWriter(), { password: pwd });
-                            return pwd;
-                        } catch (err) { return null; }
+                        try { await target.getData(new zip.BlobWriter(), { password: pwd }); return pwd; } 
+                        catch (err) { return null; }
                     });
 
                     const results = await Promise.all(promises);
                     const found = results.find(result => result !== null);
                     if (found) return found;
                 }
-            } finally {
-                if (zipR) await zipR.close();
-            }
+            } finally { if (zipR) await zipR.close(); }
             return null;
         }
 
-        // --- Auto-Save Protocol (Using PDF-Lib ONLY for saving) ---
+        // --- Unlock & Save ---
         async function attemptSave(file, ext, pwd) {
             try {
                 const newName = file.name.replace(new RegExp(`\\.${ext}$`, 'i'), `_unlocked.${ext}`);
@@ -229,50 +279,61 @@
                     }
                     await zipR.close(); await zipW.close(); downloadBlob(await writer.getData(), newName);
                 }
-                logMsg(`  [+] File Auto-Unlocked: ${newName}`, 't-success');
+                logMsg(`  ↳ Saved locally as: ${newName}`, 't-success');
             } catch (err) {
-                if (err.message.includes('encrypted')) logMsg(`  [!] Advanced AES-256 formatting locked the save. Use your phone's native Print-to-PDF trick with recovered password.`, 't-warn');
-                else logMsg(`  [!] Save Error: ${err.message}`, 't-error');
+                if (err.message.includes('encrypted')) logMsg(`  ↳ Save Skipped: Advanced AES-256 detected. Use native print-to-PDF trick.`, 't-primary');
+                else logMsg(`  ↳ Save Error: ${err.message}`, 't-error');
             }
         }
 
+        // --- Main Execution ---
         UI.btn.addEventListener('click', async () => {
             const dict = document.getElementById('dictFile').files[0]; const files = document.getElementById('files').files;
             if (!dict || !files.length) return alert('Dictionary and target files are required.');
-            UI.btn.disabled = true; UI.hud.style.display = 'block'; UI.act.innerHTML = '';
+            
+            UI.btn.disabled = true; UI.hud.style.display = 'block'; UI.act.innerHTML = ''; UI.suc.innerHTML = '';
+            const autoSaveEnabled = UI.toggle.checked;
             
             try {
-                logMsg(`=== IGNITING V8 ASYNC ENGINE ===`, 't-warn');
-                UI.hud.textContent = "Loading Dictionary Stream...";
+                logMsg(`> Engine Started (Parallel Mode)`, 't-primary');
+                UI.hud.textContent = "Loading Dictionary...";
                 await initPdfWorker();
                 
                 const passes = await loadDictionary(dict); 
                 if (!passes.length) throw new Error("Dictionary empty.");
-                logMsg(`Dictionary Configured: ${passes.length} inputs.\n`);
+                logMsg(`> Dictionary Indexed: ${passes.length} keys.\n`);
 
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i]; const ext = file.name.split('.').pop().toLowerCase();
-                    logMsg(`► Processing target [${i+1}/${files.length}]: ${file.name}`, 't-info');
-                    if (ext !== 'pdf' && ext !== 'zip') { logMsg(`  Skipped: Extension not supported.`, 't-error'); continue; }
+                    logMsg(`Processing [${i+1}/${files.length}]: ${file.name}`);
+                    if (ext !== 'pdf' && ext !== 'zip') { logMsg(`  ↳ Skipped: Unsupported file.`, 't-error'); continue; }
 
                     const pwd = ext === 'pdf' ? await processPDF(file, passes) : await processZIP(file, passes);
 
                     if (pwd === 'UNENCRYPTED' || pwd === 'EMPTY') { 
-                        logMsg(`  Notice: File is unencrypted or empty.`, 't-warn'); 
+                        logMsg(`  ↳ Notice: File is unencrypted or empty.`, 't-muted'); 
                     } else if (pwd) {
-                        logMsg(`  Password Cracked: [ ${pwd} ]`, 't-success');
-                        logMsg(`[FILE] ${file.name}\n[PASS] ${pwd}\n`, 't-success', 'suc');
-                        await attemptSave(file, ext, pwd);
+                        logMsg(`  ↳ Match Found: ${pwd}`, 't-success');
+                        logMsg(`${file.name}\nPass: ${pwd}\n`, 't-success', 'suc');
+                        
+                        if (autoSaveEnabled) {
+                            await attemptSave(file, ext, pwd);
+                        } else {
+                            logMsg(`  ↳ Auto-save bypassed by user.`, 't-muted');
+                        }
                     } else { 
-                        logMsg(`  Search Complete: Target sequence exhausted. Password not found.`, 't-error'); 
+                        logMsg(`  ↳ Failed: Password not found in dictionary.`, 't-error'); 
                     }
                 }
-                UI.hud.textContent = 'SYSTEM IDLE'; UI.hud.style.borderLeftColor = 'var(--success)';
-                logMsg('\n=== BATCH PROCESS COMPLETE ===', 't-success');
+                UI.hud.textContent = 'Status: Complete'; 
+                logMsg('\n> Batch Process Complete', 't-primary');
             } catch (err) {
-                logMsg(`CRITICAL ENGINE HALT: ${err.message}`, 't-error'); 
-                UI.hud.textContent = 'SYSTEM CRASHED'; UI.hud.style.borderLeftColor = 'var(--error)';
-            } finally { UI.btn.disabled = false; UI.btn.textContent = 'REIGNITE ENGINE'; }
+                logMsg(`> CRITICAL ERROR: ${err.message}`, 't-error'); 
+                UI.hud.textContent = 'Status: Error Halted'; 
+            } finally { 
+                UI.btn.disabled = false; 
+                UI.btn.textContent = 'Start New Batch'; 
+            }
         });
     </script>
 </body>
