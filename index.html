@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lifelong Recovery Engine v6</title>
+    <title>Multi-Core Engine v7</title>
     <style>
-        /* Immutable Calm Blue Theme */
         :root {
             --bg-base: #0f172a; --bg-surface: #1e293b; --bg-input: #0b1120;
             --text-main: #f1f5f9; --text-muted: #94a3b8;
-            --primary: #3b82f6; --primary-hover: #2563eb;
+            --primary: #8b5cf6; --primary-hover: #7c3aed; /* Changed to an aggressive violet for V7 */
             --success: #10b981; --error: #ef4444; --warning: #f59e0b;
             --border: #334155; --log-bg: #020617;
         }
@@ -17,7 +16,7 @@
         [data-theme="light"] {
             --bg-base: #f8fafc; --bg-surface: #ffffff; --bg-input: #f1f5f9;
             --text-main: #0f172a; --text-muted: #64748b;
-            --primary: #2563eb; --primary-hover: #1d4ed8;
+            --primary: #7c3aed; --primary-hover: #6d28d9;
             --success: #059669; --error: #dc2626; --warning: #d97706;
             --border: #cbd5e1; --log-bg: #f8fafc;
         }
@@ -33,7 +32,8 @@
 
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         h2 { font-weight: 600; font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
-        .version-badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; letter-spacing: 1px;}
+        .badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; letter-spacing: 1px;}
+        .core-badge { background: var(--error); margin-left: 5px; }
         
         .theme-btn {
             background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-main);
@@ -63,14 +63,16 @@
         .t-success { color: var(--success); } .t-error { color: var(--error); } .t-info { color: var(--primary); } .t-warn { color: var(--warning); } .t-muted { color: var(--text-muted); }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js"></script>
 </head>
 <body>
 
     <div class="header">
-        <h2>Recovery Engine <span class="version-badge">v6 LIFELONG</span></h2>
+        <h2>
+            Recovery Engine <span class="badge">v7 SWARM</span>
+            <span class="badge core-badge" id="coreCountBadge">Detecting Cores...</span>
+        </h2>
         <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀️ Light</button>
     </div>
 
@@ -79,10 +81,10 @@
         <input type="file" id="dictFile" accept=".txt">
         <label>2. Target Batches (.pdf, .zip)</label>
         <input type="file" id="files" multiple accept=".pdf,.zip">
-        <button id="startBtn" class="start-btn">Initialize Extraction</button>
+        <button id="startBtn" class="start-btn">IGNITE MULTI-CORE ENGINE</button>
     </div>
 
-    <div id="liveHud">Awaiting input...</div>
+    <div id="liveHud">System standing by...</div>
 
     <div class="log-grid">
         <div>
@@ -96,6 +98,10 @@
     </div>
 
     <script>
+        // --- Core Detection & UI Setup ---
+        const CORES = navigator.hardwareConcurrency || 4;
+        document.getElementById('coreCountBadge').textContent = `${CORES} Cores Active`;
+
         function toggleTheme() {
             const html = document.documentElement; const btn = document.getElementById('themeBtn');
             const isDark = html.getAttribute('data-theme') === 'dark';
@@ -110,15 +116,6 @@
             suc: document.getElementById('logSuccess')
         };
 
-        let lastUpdate = 0; const yieldUI = () => new Promise(r => setTimeout(r, 0));
-
-        const updateHud = async (msg, color = 'var(--primary)', force = false) => {
-            if (force || Date.now() - lastUpdate > 30) {
-                UI.hud.textContent = msg; UI.hud.style.borderLeftColor = color;
-                lastUpdate = Date.now(); await yieldUI();
-            }
-        };
-
         const logMsg = (msg, type = 't-muted', box = 'act') => {
             const el = document.createElement('span'); el.className = type; el.textContent = msg + '\n';
             UI[box].appendChild(el); UI[box].scrollTop = UI[box].scrollHeight;
@@ -129,14 +126,66 @@
             a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
         };
 
-        // Engine Setup (Updated fetch URL for background worker)
-        async function initPdfWorker() {
-            await updateHud('Loading background workers...', 'var(--warning)', true);
-            const res = await fetch('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js');
-            const blob = await res.blob();
-            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-        }
+        // --- The Inline Worker Blob ---
+        // This code physically runs on your background processor cores.
+        const workerScript = `
+            importScripts(
+                'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+                'https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js'
+            );
 
+            // Force libraries to run on this specific thread, not spawn sub-threads
+            pdfjsLib.GlobalWorkerOptions.disableWorker = true;
+
+            self.onmessage = async function(e) {
+                const { buffer, passwords, ext, workerId } = e.data;
+                
+                try {
+                    if (ext === 'pdf') {
+                        for (let i = 0; i < passwords.length; i++) {
+                            const pwd = passwords[i];
+                            // Send UI updates sparsely to prevent bottlenecking the core
+                            if (i % 20 === 0) self.postMessage({ type: 'progress', pwd, workerId });
+                            
+                            const task = pdfjsLib.getDocument({ data: new Uint8Array(buffer), password: pwd });
+                            try {
+                                const doc = await task.promise;
+                                await doc.destroy();
+                                self.postMessage({ type: 'found', pwd });
+                                return;
+                            } catch (err) {
+                                if (task.destroy) task.destroy().catch(()=>{});
+                                if (err.name === 'PasswordException') continue;
+                                throw err;
+                            }
+                        }
+                    } else if (ext === 'zip') {
+                        const zipR = new zip.ZipReader(new zip.BlobReader(new Blob([buffer])));
+                        const entries = await zipR.getEntries();
+                        const target = entries.find(e => e.encrypted) || entries[0];
+                        
+                        for (let i = 0; i < passwords.length; i++) {
+                            const pwd = passwords[i];
+                            if (i % 20 === 0) self.postMessage({ type: 'progress', pwd, workerId });
+                            try {
+                                await target.getData(new zip.BlobWriter(), { password: pwd });
+                                self.postMessage({ type: 'found', pwd });
+                                await zipR.close();
+                                return;
+                            } catch (err) { continue; }
+                        }
+                        await zipR.close();
+                    }
+                    self.postMessage({ type: 'not_found' });
+                } catch (error) {
+                    self.postMessage({ type: 'error', msg: error.message });
+                }
+            };
+        `;
+        const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(workerBlob);
+
+        // --- File Reading & Chunking ---
         async function loadDictionary(file) {
             const stream = file.stream(); const reader = stream.getReader(); const decoder = new TextDecoder('utf-8');
             let rem = ''; const passes = [];
@@ -144,41 +193,61 @@
                 const { done, value } = await reader.read(); if (done) break;
                 const chunk = decoder.decode(value, { stream: true });
                 const parts = (rem + chunk).split(/\s+/); rem = parts.pop(); passes.push(...parts.filter(Boolean));
-                await updateHud(`Buffering ${passes.length} passwords...`, 'var(--info)');
             }
             if (rem) passes.push(rem); return passes;
         }
 
-        // Logic Processors
-        async function processFile(file, passwords, ext) {
-            if (ext === 'pdf') {
-                const url = URL.createObjectURL(file);
-                try {
-                    const test = await pdfjsLib.getDocument({ url }).promise.catch(e => { if (e.name !== 'PasswordException') throw e; });
-                    if (test) { await test.destroy(); return 'UNENCRYPTED'; }
-                    for (let i = 0; i < passwords.length; i++) {
-                        const pwd = passwords[i]; await updateHud(`[${file.name}] Testing: ${pwd} (${i+1}/${passwords.length})`, 'var(--warning)');
-                        const task = pdfjsLib.getDocument({ url, password: pwd });
-                        try { const doc = await task.promise; await doc.destroy(); return pwd; } 
-                        catch (e) { if (task.destroy) task.destroy().catch(()=>{}); if (e.name === 'PasswordException') continue; throw e; }
+        // --- Multi-Core Swarm Orchestrator ---
+        async function swarmProcess(fileBuffer, ext, allPasswords, filename) {
+            return new Promise((resolve) => {
+                const workers = [];
+                let finishedWorkers = 0;
+                
+                // Chunk the dictionary evenly for each core
+                const chunkSize = Math.ceil(allPasswords.length / CORES);
+                
+                const killSwarm = () => {
+                    workers.forEach(w => w.terminate());
+                };
+
+                for (let i = 0; i < CORES; i++) {
+                    const passChunk = allPasswords.slice(i * chunkSize, (i + 1) * chunkSize);
+                    if (passChunk.length === 0) {
+                        finishedWorkers++;
+                        continue;
                     }
-                } finally { URL.revokeObjectURL(url); }
-            } else if (ext === 'zip') {
-                let zipR;
-                try {
-                    zipR = new zip.ZipReader(new zip.BlobReader(file)); const entries = await zipR.getEntries();
-                    if (!entries.length) return 'EMPTY'; const target = entries.find(e => e.encrypted) || entries[0];
-                    if (!target.encrypted) return 'UNENCRYPTED';
-                    for (let i = 0; i < passwords.length; i++) {
-                        const pwd = passwords[i]; await updateHud(`[${file.name}] Testing: ${pwd} (${i+1}/${passwords.length})`, 'var(--warning)');
-                        try { await target.getData(new zip.BlobWriter(), { password: pwd }); return pwd; } catch (e) { continue; }
-                    }
-                } finally { if (zipR) await zipR.close(); }
-            }
-            return null;
+
+                    const worker = new Worker(workerUrl);
+                    workers.push(worker);
+
+                    worker.onmessage = (e) => {
+                        const data = e.data;
+                        if (data.type === 'found') {
+                            killSwarm(); // INSTANTLY kill all other cores to save power
+                            resolve(data.pwd);
+                        } else if (data.type === 'progress') {
+                            UI.hud.textContent = `[Core ${data.workerId}] Testing: ${data.pwd}`;
+                        } else if (data.type === 'not_found' || data.type === 'error') {
+                            finishedWorkers++;
+                            if (finishedWorkers === CORES) {
+                                killSwarm();
+                                resolve(null); // No cores found it
+                            }
+                        }
+                    };
+
+                    // Dispatch data to the core
+                    worker.postMessage({
+                        buffer: fileBuffer,
+                        passwords: passChunk,
+                        ext: ext,
+                        workerId: i + 1
+                    });
+                }
+            });
         }
 
-        // Auto-Save Architecture
+        // --- Auto-Save ---
         async function attemptSave(file, ext, pwd) {
             try {
                 const newName = file.name.replace(new RegExp(`\\.${ext}$`, 'i'), `_unlocked.${ext}`);
@@ -196,19 +265,23 @@
                 }
                 logMsg(`  [+] Auto-saved: ${newName}`, 't-success');
             } catch (err) {
-                if (err.message.includes('encrypted')) logMsg(`  [!] Save Skipped: PDF uses Advanced AES. Must unlock manually with recovered password.`, 't-warn');
+                if (err.message.includes('encrypted')) logMsg(`  [!] Auto-save skipped: PDF requires native device printing trick.`, 't-warn');
                 else logMsg(`  [!] Save Error: ${err.message}`, 't-error');
             }
         }
 
+        // --- Main Execution ---
         UI.btn.addEventListener('click', async () => {
             const dict = document.getElementById('dictFile').files[0]; const files = document.getElementById('files').files;
             if (!dict || !files.length) return alert('Dictionary and target files are required.');
             UI.btn.disabled = true; UI.hud.style.display = 'block'; UI.act.innerHTML = '';
             
             try {
-                logMsg('=== LIFELONG ENGINE INITIATED ===', 't-warn'); await initPdfWorker();
-                const passes = await loadDictionary(dict); if (!passes.length) throw new Error("Dictionary empty.");
+                logMsg(`=== IGNITING ${CORES}-CORE SWARM ===`, 't-warn');
+                
+                UI.hud.textContent = "Buffering Dictionary...";
+                const passes = await loadDictionary(dict); 
+                if (!passes.length) throw new Error("Dictionary empty.");
                 logMsg(`Dictionary Loaded: ${passes.length} keys.\n`);
 
                 for (let i = 0; i < files.length; i++) {
@@ -216,19 +289,41 @@
                     logMsg(`► Analyzing [${i+1}/${files.length}]: ${file.name}`, 't-info');
                     if (ext !== 'pdf' && ext !== 'zip') { logMsg(`  Skipped: Unsupported.`, 't-error'); continue; }
 
-                    const pwd = await processFile(file, passes, ext);
-                    if (pwd === 'UNENCRYPTED' || pwd === 'EMPTY') { logMsg(`  Notice: No lock / Empty.`, 't-warn'); }
-                    else if (pwd) {
+                    // Buffer file into memory once to distribute to the swarm
+                    const fileBuffer = await file.arrayBuffer();
+
+                    // Pre-check for no encryption (using a quick single-thread check)
+                    let preCheck = null;
+                    if (ext === 'zip') {
+                        const zipR = new zip.ZipReader(new zip.BlobReader(file));
+                        const entries = await zipR.getEntries();
+                        if (!entries.length) preCheck = 'EMPTY';
+                        else if (!(entries.find(e => e.encrypted) || entries[0]).encrypted) preCheck = 'UNENCRYPTED';
+                        await zipR.close();
+                    }
+
+                    if (preCheck === 'EMPTY' || preCheck === 'UNENCRYPTED') {
+                        logMsg(`  Notice: No lock / Empty.`, 't-warn');
+                        continue;
+                    }
+
+                    // Hand off to the Multi-Core Orchestrator
+                    const pwd = await swarmProcess(fileBuffer, ext, passes, file.name);
+
+                    if (pwd) {
                         logMsg(`  Found Key: [ ${pwd} ]`, 't-success');
                         logMsg(`[FILE] ${file.name}\n[PASS] ${pwd}\n`, 't-success', 'suc');
                         await attemptSave(file, ext, pwd);
-                    } else { logMsg(`  Failed: Dictionary exhausted.`, 't-error'); }
-                    await yieldUI();
+                    } else { 
+                        logMsg(`  Failed: Dictionary exhausted across all cores.`, 't-error'); 
+                    }
                 }
-                await updateHud('SYSTEM IDLE', 'var(--success)', true); logMsg('\n=== BATCH COMPLETE ===', 't-success');
+                UI.hud.textContent = 'SYSTEM IDLE'; UI.hud.style.borderLeftColor = 'var(--success)';
+                logMsg('\n=== BATCH COMPLETE ===', 't-success');
             } catch (err) {
-                logMsg(`CRITICAL HALT: ${err.message}`, 't-error'); await updateHud('ERROR HALTED', 'var(--error)', true);
-            } finally { UI.btn.disabled = false; UI.btn.textContent = 'Restart Sequence'; }
+                logMsg(`CRITICAL HALT: ${err.message}`, 't-error'); 
+                UI.hud.textContent = 'ERROR HALTED'; UI.hud.style.borderLeftColor = 'var(--error)';
+            } finally { UI.btn.disabled = false; UI.btn.textContent = 'RESTART MULTI-CORE ENGINE'; }
         });
     </script>
 </body>
