@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multi-Core Engine v7.1</title>
+    <title>Async Engine v8</title>
     <style>
         :root {
             --bg-base: #0f172a; --bg-surface: #1e293b; --bg-input: #0b1120;
             --text-main: #f1f5f9; --text-muted: #94a3b8;
-            --primary: #8b5cf6; --primary-hover: #7c3aed;
+            --primary: #0ea5e9; --primary-hover: #0284c7; /* Cyan / Sky Blue */
             --success: #10b981; --error: #ef4444; --warning: #f59e0b;
             --border: #334155; --log-bg: #020617;
         }
@@ -16,40 +16,26 @@
         [data-theme="light"] {
             --bg-base: #f8fafc; --bg-surface: #ffffff; --bg-input: #f1f5f9;
             --text-main: #0f172a; --text-muted: #64748b;
-            --primary: #7c3aed; --primary-hover: #6d28d9;
+            --primary: #0284c7; --primary-hover: #0369a1;
             --success: #059669; --error: #dc2626; --warning: #d97706;
             --border: #cbd5e1; --log-bg: #f8fafc;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background-color: var(--bg-base); color: var(--text-main);
-            max-width: 1200px; margin: 0 auto; padding: 1.5rem; line-height: 1.5;
-            transition: all 0.3s ease;
-        }
-
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-base); color: var(--text-main); max-width: 1200px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; transition: all 0.3s ease; }
+        
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         h2 { font-weight: 600; font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
-        .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; letter-spacing: 1px;}
-        .engine-badge { background: var(--primary); color: white; }
-        .core-badge { background: var(--error); color: white; margin-left: 5px; }
+        .badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; letter-spacing: 1px;}
+        .batch-badge { background: var(--warning); margin-left: 5px; }
         
-        .theme-btn {
-            background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-main);
-            padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500;
-        }
-
+        .theme-btn { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-main); padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+        
         .panel { background: var(--bg-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 1.5rem; }
         label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
         input[type="file"] { width: 100%; padding: 0.75rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-main); margin-bottom: 1.25rem; }
         
-        .start-btn {
-            background: var(--primary); color: white; border: none; padding: 1rem; border-radius: 8px;
-            cursor: pointer; font-weight: 600; width: 100%; text-transform: uppercase; letter-spacing: 1px;
-            transition: transform 0.1s, background 0.2s;
-        }
+        .start-btn { background: var(--primary); color: white; border: none; padding: 1rem; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s, background 0.2s; }
         .start-btn:active { transform: scale(0.98); }
         .start-btn:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
 
@@ -64,15 +50,16 @@
         .t-success { color: var(--success); } .t-error { color: var(--error); } .t-info { color: var(--primary); } .t-warn { color: var(--warning); } .t-muted { color: var(--text-muted); }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 <body>
 
     <div class="header">
         <h2>
-            Recovery Engine <span class="badge engine-badge">v7.1 SWARM</span>
-            <span class="badge core-badge" id="coreCountBadge">Detecting Cores...</span>
+            Recovery Engine <span class="badge">v8 ASYNC</span>
+            <span class="badge batch-badge" id="batchBadge">Calculating Array...</span>
         </h2>
         <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀️ Light</button>
     </div>
@@ -82,7 +69,7 @@
         <input type="file" id="dictFile" accept=".txt">
         <label>2. Target Batches (.pdf, .zip)</label>
         <input type="file" id="files" multiple accept=".pdf,.zip">
-        <button id="startBtn" class="start-btn">IGNITE MULTI-CORE ENGINE</button>
+        <button id="startBtn" class="start-btn">IGNITE CONCURRENCY ENGINE</button>
     </div>
 
     <div id="liveHud">System standing by...</div>
@@ -99,8 +86,10 @@
     </div>
 
     <script>
+        // Optimal batch size: Double the CPU cores to keep the pipeline completely saturated.
         const CORES = navigator.hardwareConcurrency || 4;
-        document.getElementById('coreCountBadge').textContent = `${CORES} Cores Active`;
+        const BATCH_SIZE = Math.max(CORES * 2, 8); 
+        document.getElementById('batchBadge').textContent = `${BATCH_SIZE}x Parallel Batches`;
 
         function toggleTheme() {
             const html = document.documentElement; const btn = document.getElementById('themeBtn');
@@ -126,60 +115,22 @@
             a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
         };
 
-        // --- The High-Performance Visual-Free Core Script ---
-        const workerScript = `
-            importScripts(
-                'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
-                'https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js'
-            );
+        let lastUpdate = 0;
+        const yieldUI = () => new Promise(r => setTimeout(r, 0));
+        const updateHud = async (msg, color = 'var(--primary)', force = false) => {
+            if (force || Date.now() - lastUpdate > 35) {
+                UI.hud.textContent = msg; UI.hud.style.borderLeftColor = color;
+                lastUpdate = Date.now(); await yieldUI();
+            }
+        };
 
-            self.onmessage = async function(e) {
-                const { buffer, passwords, ext, workerId } = e.data;
-                
-                try {
-                    if (ext === 'pdf') {
-                        for (let i = 0; i < passwords.length; i++) {
-                            const pwd = passwords[i];
-                            if (i % 10 === 0) self.postMessage({ type: 'progress', pwd, workerId });
-                            
-                            try {
-                                // Pure math execution block - completely safe from DOM crashes
-                                await PDFLib.PDFDocument.load(buffer, { password: pwd, ignoreEncryption: false });
-                                self.postMessage({ type: 'found', pwd });
-                                return;
-                            } catch (err) {
-                                const msg = err.message.toLowerCase();
-                                if (msg.includes('password') || msg.includes('decrypt') || msg.includes('authenticate')) {
-                                    continue;
-                                }
-                                throw err;
-                            }
-                        }
-                    } else if (ext === 'zip') {
-                        const zipR = new zip.ZipReader(new zip.BlobReader(new Blob([buffer])));
-                        const entries = await zipR.getEntries();
-                        const target = entries.find(e => e.encrypted) || entries[0];
-                        
-                        for (let i = 0; i < passwords.length; i++) {
-                            const pwd = passwords[i];
-                            if (i % 10 === 0) self.postMessage({ type: 'progress', pwd, workerId });
-                            try {
-                                await target.getData(new zip.BlobWriter(), { password: pwd });
-                                self.postMessage({ type: 'found', pwd });
-                                await zipR.close();
-                                return;
-                            } catch (err) { continue; }
-                        }
-                        await zipR.close();
-                    }
-                    self.postMessage({ type: 'not_found' });
-                } catch (error) {
-                    self.postMessage({ type: 'error', msg: error.message, workerId });
-                }
-            };
-        `;
-        const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
-        const workerUrl = URL.createObjectURL(workerBlob);
+        // Initialize Native PDF.js background worker
+        async function initPdfWorker() {
+            await updateHud('Waking native background workers...', 'var(--warning)', true);
+            const res = await fetch('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js');
+            const blob = await res.blob();
+            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+        }
 
         async function loadDictionary(file) {
             const stream = file.stream(); const reader = stream.getReader(); const decoder = new TextDecoder('utf-8');
@@ -192,54 +143,77 @@
             if (rem) passes.push(rem); return passes;
         }
 
-        async function swarmProcess(fileBuffer, ext, allPasswords) {
-            return new Promise((resolve) => {
-                const workers = [];
-                let finishedWorkers = 0;
-                const chunkSize = Math.ceil(allPasswords.length / CORES);
-                
-                const killSwarm = () => {
-                    workers.forEach(w => w.terminate());
-                };
+        // --- The Asynchronous Concurrency Engine ---
+        async function processPDF(file, allPasswords) {
+            const fileUrl = URL.createObjectURL(file);
+            try {
+                // Pre-check
+                try {
+                    const test = await pdfjsLib.getDocument({ url: fileUrl }).promise;
+                    await test.destroy(); return 'UNENCRYPTED';
+                } catch (e) { if (e.name !== 'PasswordException') throw e; }
 
-                for (let i = 0; i < CORES; i++) {
-                    const passChunk = allPasswords.slice(i * chunkSize, (i + 1) * chunkSize);
-                    if (passChunk.length === 0) {
-                        finishedWorkers++;
-                        if (finishedWorkers === CORES) resolve(null);
-                        continue;
-                    }
-
-                    const worker = new Worker(workerUrl);
-                    workers.push(worker);
-
-                    worker.onmessage = (e) => {
-                        const data = e.data;
-                        if (data.type === 'found') {
-                            killSwarm();
-                            resolve(data.pwd);
-                        } else if (data.type === 'progress') {
-                            UI.hud.textContent = `[Core ${data.workerId}] Processing: ${data.pwd}`;
-                        } else if (data.type === 'error') {
-                            logMsg(`  [!] Core ${data.workerId} Thread Fault: ${data.msg}`, 't-error');
-                            finishedWorkers++;
-                            if (finishedWorkers === CORES) { killSwarm(); resolve(null); }
-                        } else if (data.type === 'not_found') {
-                            finishedWorkers++;
-                            if (finishedWorkers === CORES) { killSwarm(); resolve(null); }
+                // Process in Parallel Batches
+                for (let i = 0; i < allPasswords.length; i += BATCH_SIZE) {
+                    const batch = allPasswords.slice(i, i + BATCH_SIZE);
+                    await updateHud(`[${file.name}] Async Batch: ${i} to ${i + batch.length} / ${allPasswords.length}`, 'var(--primary)');
+                    
+                    // Create an array of simultaneous promises
+                    const promises = batch.map(async (pwd) => {
+                        const task = pdfjsLib.getDocument({ url: fileUrl, password: pwd });
+                        try {
+                            const doc = await task.promise;
+                            await doc.destroy();
+                            return pwd; // Match!
+                        } catch (err) {
+                            if (task.destroy) task.destroy().catch(()=>{});
+                            if (err.name === 'PasswordException') return null; // Safe fail
+                            throw err; // Real crash
                         }
-                    };
-
-                    worker.postMessage({
-                        buffer: fileBuffer,
-                        passwords: passChunk,
-                        ext: ext,
-                        workerId: i + 1
                     });
+
+                    // Wait for the whole batch to finish instantly
+                    const results = await Promise.all(promises);
+                    const found = results.find(result => result !== null);
+                    if (found) return found;
                 }
-            });
+            } finally {
+                URL.revokeObjectURL(fileUrl);
+            }
+            return null;
         }
 
+        async function processZIP(file, allPasswords) {
+            let zipR;
+            try {
+                zipR = new zip.ZipReader(new zip.BlobReader(file));
+                const entries = await zipR.getEntries();
+                if (!entries.length) return 'EMPTY';
+                const target = entries.find(e => e.encrypted) || entries[0];
+                if (!target.encrypted) return 'UNENCRYPTED';
+
+                for (let i = 0; i < allPasswords.length; i += BATCH_SIZE) {
+                    const batch = allPasswords.slice(i, i + BATCH_SIZE);
+                    await updateHud(`[${file.name}] Async Batch: ${i} to ${i + batch.length} / ${allPasswords.length}`, 'var(--primary)');
+                    
+                    const promises = batch.map(async (pwd) => {
+                        try {
+                            await target.getData(new zip.BlobWriter(), { password: pwd });
+                            return pwd;
+                        } catch (err) { return null; }
+                    });
+
+                    const results = await Promise.all(promises);
+                    const found = results.find(result => result !== null);
+                    if (found) return found;
+                }
+            } finally {
+                if (zipR) await zipR.close();
+            }
+            return null;
+        }
+
+        // --- Auto-Save Protocol (Using PDF-Lib ONLY for saving) ---
         async function attemptSave(file, ext, pwd) {
             try {
                 const newName = file.name.replace(new RegExp(`\\.${ext}$`, 'i'), `_unlocked.${ext}`);
@@ -268,8 +242,9 @@
             UI.btn.disabled = true; UI.hud.style.display = 'block'; UI.act.innerHTML = '';
             
             try {
-                logMsg(`=== IGNITING ${CORES}-CORE ENGINE ===`, 't-warn');
-                UI.hud.textContent = "Loading dictionary file...";
+                logMsg(`=== IGNITING V8 ASYNC ENGINE ===`, 't-warn');
+                UI.hud.textContent = "Loading Dictionary Stream...";
+                await initPdfWorker();
                 
                 const passes = await loadDictionary(dict); 
                 if (!passes.length) throw new Error("Dictionary empty.");
@@ -280,15 +255,16 @@
                     logMsg(`► Processing target [${i+1}/${files.length}]: ${file.name}`, 't-info');
                     if (ext !== 'pdf' && ext !== 'zip') { logMsg(`  Skipped: Extension not supported.`, 't-error'); continue; }
 
-                    const fileBuffer = await file.arrayBuffer();
-                    const pwd = await swarmProcess(fileBuffer, ext, passes);
+                    const pwd = ext === 'pdf' ? await processPDF(file, passes) : await processZIP(file, passes);
 
-                    if (pwd) {
+                    if (pwd === 'UNENCRYPTED' || pwd === 'EMPTY') { 
+                        logMsg(`  Notice: File is unencrypted or empty.`, 't-warn'); 
+                    } else if (pwd) {
                         logMsg(`  Password Cracked: [ ${pwd} ]`, 't-success');
                         logMsg(`[FILE] ${file.name}\n[PASS] ${pwd}\n`, 't-success', 'suc');
                         await attemptSave(file, ext, pwd);
                     } else { 
-                        logMsg(`  Search Complete: Target sequence exhausted. Password not found in current dictionary.`, 't-error'); 
+                        logMsg(`  Search Complete: Target sequence exhausted. Password not found.`, 't-error'); 
                     }
                 }
                 UI.hud.textContent = 'SYSTEM IDLE'; UI.hud.style.borderLeftColor = 'var(--success)';
