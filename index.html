@@ -135,7 +135,6 @@
         }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.4.26/dist/zip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
@@ -275,7 +274,7 @@
                 localStorage.removeItem(VAULT_KEY); loadVault();
             }
         }
-        loadVault(); // Init on load
+        loadVault();
 
         // --- Timer & Stats Logic ---
         let startTime = 0; 
@@ -305,38 +304,25 @@
         }
         function stopTimer() { clearInterval(timerInterval); }
 
-        // --- Background Workers ---
-        async function initPdfWorker() {
-            const res = await fetch('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js');
-            const blob = await res.blob();
-            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-        }
 
-        // --- Core Async Engine (Streaming & Memory Safe) ---
-        async function processBatches(passwordBuffer, fileUrl, zipTarget, ext, batchSize) {
+        // --- Core Async Engine ---
+        async function processBatches(passwordBuffer, pdfTargetBytes, zipTarget, ext, batchSize) {
             for (let i = 0; i < passwordBuffer.length; i += batchSize) {
-                if (!isRunning) return null; // Abort signal
+                if (!isRunning) return null; 
                 
                 const batch = passwordBuffer.slice(i, i + batchSize);
                 
                 const promises = batch.map(async (pwd) => {
-                    let loadingTask = null;
                     try {
                         if (ext === 'pdf') {
-                            loadingTask = pdfjsLib.getDocument({ url: fileUrl, password: pwd });
-                            const doc = await loadingTask.promise; 
-                            await doc.destroy(); 
+                            // Using pdf-lib exclusively. Much more stable than pdf.js workers.
+                            await PDFLib.PDFDocument.load(pdfTargetBytes, { password: pwd, updateMetadata: false }); 
                             return pwd;
                         } else {
-                            // FIX 1: Reverted to BlobWriter. TextWriter crashes when attempting to read binary 
-                            // data (like images/PDFs inside the ZIP) throwing a false-negative error.
                             await zipTarget.getData(new zip.BlobWriter(), { password: pwd }); 
                             return pwd;
                         }
                     } catch (err) { 
-                        if (loadingTask && loadingTask.destroy) {
-                            try { await loadingTask.destroy(); } catch(e) {}
-                        }
                         return null; 
                     }
                 });
@@ -348,34 +334,37 @@
                 const found = results.find(r => r !== null);
                 if (found) return found;
 
-                // THE MAGIC BREATHER: Yields control back to the event loop.
+                // Yield to event loop
                 await new Promise(resolve => setTimeout(resolve, 5));
             }
             return null;
         }
 
         async function streamEngine(targetFile, dictFile, ext, batchSize) {
-            const fileUrl = ext === 'pdf' ? URL.createObjectURL(targetFile) : null;
             let zipR = null; 
             let zipTarget = null;
+            let pdfTargetBytes = null;
             
             try {
                 // Phase 1: Setup Target & Check Encryption
                 if (ext === 'pdf') {
+                    // Load PDF into memory buffer once
+                    pdfTargetBytes = new Uint8Array(await targetFile.arrayBuffer());
                     try { 
-                        const testTask = pdfjsLib.getDocument({ url: fileUrl });
-                        const test = await testTask.promise; 
-                        await test.destroy(); 
+                        await PDFLib.PDFDocument.load(pdfTargetBytes, { updateMetadata: false });
                         return 'UNENCRYPTED'; 
                     } catch (e) { 
-                        if (e.name !== 'PasswordException') throw e; 
+                        // pdf-lib throws if encrypted. If the error isn't about encryption/password, the file is corrupt.
+                        const msg = e.message.toLowerCase();
+                        if (!msg.includes('password') && !msg.includes('encrypted')) {
+                            throw new Error("Invalid or corrupted PDF file.");
+                        }
                     }
                 } else {
                     zipR = new zip.ZipReader(new zip.BlobReader(targetFile));
                     const entries = await zipR.getEntries();
                     if (!entries.length) return 'EMPTY';
                     
-                    // FIX 2: Added `!e.directory` so it doesn't accidentally try to decrypt an empty folder
                     const encryptedEntries = entries.filter(e => e.encrypted && !e.directory);
                     if (!encryptedEntries.length) return 'UNENCRYPTED';
                     
@@ -384,7 +373,7 @@
                     );
                 }
 
-                // Phase 2: Stream Dictionary from Disk (Zero Memory Bloat)
+                // Phase 2: Stream Dictionary from Disk 
                 const stream = dictFile.stream(); 
                 const reader = stream.getReader(); 
                 const decoder = new TextDecoder('utf-8');
@@ -398,15 +387,12 @@
                     if (done) break;
                     
                     const chunk = decoder.decode(value, { stream: true });
-                    
-                    // FIX 3: Reverted to your exact original \s+ regex. 
-                    // This handles space-separated dictionaries properly, exactly as you originally engineered it.
                     const parts = (remainder + chunk).split(/\s+/); 
                     remainder = parts.pop();
                     passwordBuffer.push(...parts.filter(Boolean));
 
                     if (passwordBuffer.length >= CHUNK_LIMIT) {
-                        const found = await processBatches(passwordBuffer, fileUrl, zipTarget, ext, batchSize);
+                        const found = await processBatches(passwordBuffer, pdfTargetBytes, zipTarget, ext, batchSize);
                         if (found) return found;
                         passwordBuffer = []; 
                     }
@@ -415,12 +401,11 @@
                 // Phase 3: Process leftovers
                 if (remainder) passwordBuffer.push(remainder);
                 if (passwordBuffer.length > 0 && isRunning) {
-                    const found = await processBatches(passwordBuffer, fileUrl, zipTarget, ext, batchSize);
+                    const found = await processBatches(passwordBuffer, pdfTargetBytes, zipTarget, ext, batchSize);
                     if (found) return found;
                 }
 
             } finally {
-                if (fileUrl) URL.revokeObjectURL(fileUrl);
                 if (zipR) await zipR.close();
             }
             return null;
@@ -475,7 +460,6 @@
 
             try {
                 logMsg(`Engine Booted | Concurrency: ${batchSize}x`, 'info', '🚀');
-                await initPdfWorker();
                 startTimer();
                 
                 logMsg(`Streaming dictionary from disk (RAM Safe Mode)`, 'info', '🌊');
@@ -489,7 +473,6 @@
                     logMsg(`Analyzing target: ${file.name}`, 'info', '🔍');
                     if (ext !== 'pdf' && ext !== 'zip') { logMsg(`Skipped unsupported file format.`, 'error', '⚠️'); continue; }
 
-                    // Process stream directly against the target
                     const pwd = await streamEngine(file, dictFile, ext, batchSize);
 
                     if (!isRunning) {
