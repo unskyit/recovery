@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌈 PDF & ZIP Vault Breaker
+# 📄 PDF & 📦 ZIP Password Recovery
 **Zero-Installation, 100% Client-Side Password Recovery Engine**
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
