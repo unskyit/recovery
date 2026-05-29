@@ -10,7 +10,7 @@
 ![RAM-Safe](https://img.shields.io/badge/RAM_Safe-0078D4?style=for-the-badge)
 ![No Install](https://img.shields.io/badge/No_Installation-8A2BE2?style=for-the-badge)
 
-<img src="https://images.unsplash.com/photo-1555949963-aa79dcee981c?q=80&w=1200&auto=format&fit=crop" alt="App UI" style="border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); margin: 20px 0; max-width: 100%; height: auto;">
+<img src="./pdf-zip-password-recovery.png" alt="App UI" style="border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); margin: 20px 0; max-width: 100%; height: auto;">
 *(Replace the image link above with a screenshot of your actual UI!)*
 
 </div>
