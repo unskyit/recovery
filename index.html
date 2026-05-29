@@ -6,6 +6,8 @@
     <title>PDF & ZIP Password Recovery</title>
     <meta name="description" content="A clean, secure, client-side PDF and ZIP password recovery utility.">
     
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔓</text></svg>">
+    
     <style>
         /* Joyful, Calm Blue, Premium UI */
         :root {
@@ -315,8 +317,10 @@
                 const promises = batch.map(async (pwd) => {
                     try {
                         if (ext === 'pdf') {
-                            // Using pdf-lib exclusively. Much more stable than pdf.js workers.
-                            await PDFLib.PDFDocument.load(pdfTargetBytes, { password: pwd, updateMetadata: false }); 
+                            // CRITICAL FIX: The .slice() method creates a fresh clone of the bytes.
+                            // Without this, pdf-lib modifies the original array during decryption, 
+                            // corrupting the file in RAM and guaranteeing all future attempts fail.
+                            await PDFLib.PDFDocument.load(pdfTargetBytes.slice(), { password: pwd, updateMetadata: false }); 
                             return pwd;
                         } else {
                             await zipTarget.getData(new zip.BlobWriter(), { password: pwd }); 
@@ -351,10 +355,11 @@
                     // Load PDF into memory buffer once
                     pdfTargetBytes = new Uint8Array(await targetFile.arrayBuffer());
                     try { 
-                        await PDFLib.PDFDocument.load(pdfTargetBytes, { updateMetadata: false });
+                        // Test without password to see if it's already open
+                        await PDFLib.PDFDocument.load(pdfTargetBytes.slice(), { updateMetadata: false });
                         return 'UNENCRYPTED'; 
                     } catch (e) { 
-                        // pdf-lib throws if encrypted. If the error isn't about encryption/password, the file is corrupt.
+                        // pdf-lib throws if encrypted.
                         const msg = e.message.toLowerCase();
                         if (!msg.includes('password') && !msg.includes('encrypted')) {
                             throw new Error("Invalid or corrupted PDF file.");
@@ -416,6 +421,7 @@
             try {
                 const newName = file.name.replace(new RegExp(`\\.${ext}$`, 'i'), `${suffix}.${ext}`);
                 if (ext === 'pdf') {
+                    // Safe to load without .slice() here because we are passing it directly to be saved, not re-looped.
                     const doc = await PDFLib.PDFDocument.load(await file.arrayBuffer(), { password: pwd });
                     downloadBlob(new Blob([await doc.save()], { type: 'application/pdf' }), newName);
                 } else if (ext === 'zip') {
