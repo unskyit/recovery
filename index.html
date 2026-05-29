@@ -328,12 +328,12 @@
                             await doc.destroy(); 
                             return pwd;
                         } else {
-                            // OPTIMIZATION: TextWriter takes virtually zero RAM compared to BlobWriter
-                            await zipTarget.getData(new zip.TextWriter(), { password: pwd }); 
+                            // FIX 1: Reverted to BlobWriter. TextWriter crashes when attempting to read binary 
+                            // data (like images/PDFs inside the ZIP) throwing a false-negative error.
+                            await zipTarget.getData(new zip.BlobWriter(), { password: pwd }); 
                             return pwd;
                         }
                     } catch (err) { 
-                        // CRITICAL: Explicitly destroy the loading task on failure to free memory
                         if (loadingTask && loadingTask.destroy) {
                             try { await loadingTask.destroy(); } catch(e) {}
                         }
@@ -349,7 +349,6 @@
                 if (found) return found;
 
                 // THE MAGIC BREATHER: Yields control back to the event loop.
-                // This prevents the GC starvation that was causing your 231-crash.
                 await new Promise(resolve => setTimeout(resolve, 5));
             }
             return null;
@@ -376,10 +375,10 @@
                     const entries = await zipR.getEntries();
                     if (!entries.length) return 'EMPTY';
                     
-                    const encryptedEntries = entries.filter(e => e.encrypted);
+                    // FIX 2: Added `!e.directory` so it doesn't accidentally try to decrypt an empty folder
+                    const encryptedEntries = entries.filter(e => e.encrypted && !e.directory);
                     if (!encryptedEntries.length) return 'UNENCRYPTED';
                     
-                    // OPTIMIZATION: Always test against the SMALLEST encrypted file.
                     zipTarget = encryptedEntries.reduce((prev, curr) => 
                         (prev.uncompressedSize < curr.uncompressedSize) ? prev : curr
                     );
@@ -392,8 +391,6 @@
                 
                 let remainder = '';
                 let passwordBuffer = [];
-                // Chunk size determines how many passwords we hold in RAM at once. 
-                // 5000 is extremely safe and keeps overhead low.
                 const CHUNK_LIMIT = 5000; 
 
                 while (isRunning) {
@@ -401,17 +398,16 @@
                     if (done) break;
                     
                     const chunk = decoder.decode(value, { stream: true });
-                    // Handle standard text file lines (handles both \n and \r\n)
-                    const lines = (remainder + chunk).split(/\r?\n/); 
-                    remainder = lines.pop(); // Keep incomplete line for next chunk
                     
-                    passwordBuffer.push(...lines.filter(Boolean));
+                    // FIX 3: Reverted to your exact original \s+ regex. 
+                    // This handles space-separated dictionaries properly, exactly as you originally engineered it.
+                    const parts = (remainder + chunk).split(/\s+/); 
+                    remainder = parts.pop();
+                    passwordBuffer.push(...parts.filter(Boolean));
 
                     if (passwordBuffer.length >= CHUNK_LIMIT) {
                         const found = await processBatches(passwordBuffer, fileUrl, zipTarget, ext, batchSize);
                         if (found) return found;
-                        
-                        // Dump processed chunk from RAM
                         passwordBuffer = []; 
                     }
                 }
@@ -456,7 +452,6 @@
         // --- Main Execution ---
         UI.btn.addEventListener('click', async () => {
             if (isRunning) {
-                // Allow user to cancel
                 isRunning = false;
                 UI.btn.textContent = 'Stopping...';
                 return;
@@ -476,7 +471,6 @@
             const suffix = document.getElementById('suffixInput').value || '_unlocked';
             
             const coreVal = document.getElementById('coreSelect').value;
-            // Lowered auto-batch slightly to prevent GC pileup during streaming
             const batchSize = coreVal === 'auto' ? Math.max((navigator.hardwareConcurrency || 4), 8) : parseInt(coreVal);
 
             try {
