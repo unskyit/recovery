@@ -325,11 +325,9 @@
                     let loadingTask = null;
                     try {
                         if (ext === 'pdf') {
-                            // WE ARE BACK TO PDF.JS for the cracking phase!
-                            // By using data: Uint8Array instead of a Blob URL, we prevent the browser from 
-                            // collapsing under network/blob memory overhead.
+                            // FIX: Provide a fresh isolated slice of the ArrayBuffer to prevent worker caching collision
                             loadingTask = pdfjsLib.getDocument({
-                                data: pdfTargetBytes,
+                                data: pdfTargetBytes.slice(0),
                                 password: pwd,
                             });
                             const doc = await loadingTask.promise; 
@@ -340,10 +338,16 @@
                             return pwd;
                         }
                     } catch (err) { 
-                        // It failed. Ensure we completely nuke the loading task to prevent memory leaks.
                         if (loadingTask && loadingTask.destroy) {
                             try { await loadingTask.destroy(); } catch(e) {}
                         }
+                        
+                        // FIX: If PDF.js throws an error but it's NOT a password error, 
+                        // it means decryption succeeded but it couldn't parse the internal stream.
+                        if (ext === 'pdf' && err.name !== 'PasswordException') {
+                            return pwd; // It's the correct password!
+                        }
+                        
                         return null; 
                     }
                 });
@@ -355,7 +359,6 @@
                 const found = results.find(r => r !== null);
                 if (found) return found;
 
-                // Yield to event loop to clear garbage memory
                 await new Promise(resolve => setTimeout(resolve, 5));
             }
             return null;
@@ -369,16 +372,17 @@
             try {
                 // Phase 1: Setup Target & Check Encryption
                 if (ext === 'pdf') {
-                    // Load the PDF completely into a byte array once to feed directly into pdf.js
                     pdfTargetBytes = new Uint8Array(await targetFile.arrayBuffer());
                     
                     try { 
-                        const testTask = pdfjsLib.getDocument({ data: pdfTargetBytes });
+                        // FIX: Isolated slice for the initial check as well
+                        const testTask = pdfjsLib.getDocument({ data: pdfTargetBytes.slice(0) });
                         const test = await testTask.promise; 
                         await test.destroy(); 
                         return 'UNENCRYPTED'; 
                     } catch (e) { 
-                        if (e.name !== 'PasswordException') throw e; 
+                        // If it's anything other than a PasswordException, it's either unencrypted or corrupted.
+                        if (e.name !== 'PasswordException') return 'UNENCRYPTED';
                     }
                 } else {
                     zipR = new zip.ZipReader(new zip.BlobReader(targetFile));
@@ -436,8 +440,6 @@
             try {
                 const newName = file.name.replace(new RegExp(`\\.${ext}$`, 'i'), `${suffix}.${ext}`);
                 if (ext === 'pdf') {
-                    // We use pdf-lib for SAVING ONLY. 
-                    // This is what generates your familiar "AES encrypted" warning if it fails to save a clean copy.
                     const doc = await PDFLib.PDFDocument.load(await file.arrayBuffer(), { password: pwd });
                     downloadBlob(new Blob([await doc.save()], { type: 'application/pdf' }), newName);
                 } else if (ext === 'zip') {
@@ -451,9 +453,9 @@
                 }
                 logMsg(`Clean copy saved: ${newName}`, 'success', '💾');
             } catch (err) {
-                // If pdf-lib chokes on AES during save, it safely catches here.
-                if (err.message.includes('encrypted') || err.message.includes('Security')) {
-                    logMsg(`Password verified, but auto-save skipped: PDF is heavily AES encrypted. Please use the password to open it natively.`, 'error', '⚠️');
+                // FIX: Explicitly handle PDF-lib AES save failures gracefully
+                if (ext === 'pdf' && (err.message.includes('encrypted') || err.message.includes('Security'))) {
+                    logMsg(`File is AES encrypted. Auto-save skipped. Please use the password from the Local Vault to unlock it natively.`, 'error', '🔒');
                 } else {
                     logMsg(`Save Error: ${err.message}`, 'error', '❌');
                 }
@@ -511,7 +513,10 @@
                         logMsg(`File is unencrypted or empty.`, 'info', '✅'); 
                     } else if (pwd) {
                         logMsg(`Password matched! ${pwd}`, 'success', '🎉');
+                        
+                        // The password ALWAYS gets saved to the vault here, regardless of auto-save success.
                         saveToVault(file.name, pwd);
+                        
                         if (autoSaveEnabled) await attemptSave(file, ext, pwd, suffix);
                     } else { 
                         logMsg(`Sequence exhausted. No match found.`, 'error', '❌'); 
